@@ -435,3 +435,89 @@ def get_svm_matrix(test_csv, pred_csv):
     return pd.DataFrame(score_matrix)
 
 
+def get_random_units(units, num_units, sort_by, percentage_true=1, upper_bound=None, **quadrants):
+    if sort_by == 'fit':
+        fit = pd.DataFrame(np.array([[unit.coeff1, unit.coeff2, unit.r_sqrd] for unit in units]), 
+                           columns=['coeff1', 'coeff2', 'rsqrd'])
+
+        # Define upper bound conditions
+        conditions = {}
+        for quad, cond in quadrants.items():
+            if upper_bound and quad in upper_bound:
+                upper_bound_1, upper_bound_2 = upper_bound[quad]
+                
+                if quad in ['Q1', 'Q3']:
+                    bound_conditions = ((fit['coeff1'].abs() <= upper_bound_1), (fit['coeff2'].abs() <= upper_bound_2))
+                elif quad == 'Q2':
+                    bound_conditions = ((fit['coeff1'] >= upper_bound_1) & (fit['coeff1'] <= 0), (fit['coeff2'].abs() <= upper_bound_2))
+                elif quad == 'Q4':
+                    bound_conditions = ((fit['coeff1'] <= upper_bound_1) & (fit['coeff1'] >= 0), (fit['coeff2'].abs() <= upper_bound_2))
+            else:
+                bound_conditions = (True, True)
+                
+            conditions[quad] = (fit['rsqrd'] > 0.1) & bound_conditions[0] & bound_conditions[1]
+
+    elif sort_by == 'ktau':
+        fit = pd.DataFrame(np.array([[unit.kendall_stats['averaged_across_sizes']['tau'],
+                                      unit.kendall_stats['averaged_across_numbers']['tau']] for unit in units]),
+                           columns=['ktau_num', 'ktau_size'])
+
+        # Define upper bound conditions
+        conditions = {}
+        for quad, cond in quadrants.items():
+            if upper_bound and quad in upper_bound:
+                upper_bound_1, upper_bound_2 = upper_bound[quad]
+                
+                if quad in ['Q1', 'Q3']:
+                    bound_conditions = ((fit['ktau_num'].abs() <= upper_bound_1), (fit['ktau_size'].abs() <= upper_bound_2))
+                elif quad == 'Q2':
+                    bound_conditions = ((fit['ktau_num'] >= upper_bound_1) & (fit['ktau_num'] <= 0), (fit['ktau_size'].abs() <= upper_bound_2))
+                elif quad == 'Q4':
+                    bound_conditions = ((fit['ktau_num'] <= upper_bound_1) & (fit['ktau_num'] >= 0), (fit['ktau_size'].abs() <= upper_bound_2))
+            else:
+                bound_conditions = (True, True)
+                
+            conditions[quad] = bound_conditions[0] & bound_conditions[1]
+
+    else:
+        print("Invalid sort_by value. Please use 'fit' or 'ktau'.")
+        return None
+
+    # Filter indices based on specified quadrants for true units
+    selected_indices_true = []
+    for quad, cond in conditions.items():
+        if quadrants.get(quad, False):
+            selected_indices_true.extend(fit[cond].index.tolist())
+    
+    # Define conditions for false units
+    conditions_false = {quad: ~cond for quad, cond in conditions.items()}
+    
+    # Filter indices based on specified quadrants for false units
+    selected_indices_false = []
+    for quad, cond in conditions_false.items():
+        if quadrants.get(quad, False):
+            selected_indices_false.extend(fit[cond].index.tolist())
+    
+    # Ensure unique indices
+    selected_indices_true = list(set(selected_indices_true))
+    selected_indices_false = list(set(selected_indices_false))
+
+    # Determine number of units to sample from each group
+    num_true = int(num_units * percentage_true)
+    num_false = num_units - num_true
+    
+    # Check if there are enough units to sample from
+    if num_true > len(selected_indices_true):
+        print(f"Not enough true units to sample from. Required: {num_true}, Available: {len(selected_indices_true)}")
+        return None
+    if num_false > len(selected_indices_false):
+        print(f"Not enough false units to sample from. Required: {num_false}, Available: {len(selected_indices_false)}")
+        return None
+
+    # Randomly sample indices
+    random_indices_true = np.random.choice(selected_indices_true, num_true, replace=False) if num_true > 0 else []
+    random_indices_false = np.random.choice(selected_indices_false, num_false, replace=False) if num_false > 0 else []
+
+    # Combine and return indices as a NumPy array
+    random_indices = np.concatenate([random_indices_true, random_indices_false]).astype(int)
+    return random_indices

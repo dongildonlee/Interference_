@@ -16,9 +16,11 @@ codes/fig1/run_anova2.ipynb
 codes/fig1/.ipynb_checkpoints/run_anova2-checkpoint.ipynb
 codes/fig1/*.pdf
 codes/fig1/*.ai
+codes/fig1/*.png
 codes/fig2/*.pdf
 codes/fig2/*.ai
+codes/fig2/*.png
 codes/fig3/*.pdf
 codes/fig3/*.ai
-
+codes/fig3/*.png
 
