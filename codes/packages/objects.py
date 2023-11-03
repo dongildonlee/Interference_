@@ -215,7 +215,44 @@ class Unit:
 
         return df_PS, df_PS_subset
     
-    def regression_model(self, avg_actv_nxs):
+    # def regression_model(self, avg_actv_nxs):
+    #     # Read df_cularea
+    #     df_cularea = pd.read_csv('../number_size_cumulativearea.csv', index_col=0)
+
+    #     # Log-transform numbers
+    #     log_numbers = np.log10(df_cularea.index.values)
+    #     log_numbers = np.repeat(log_numbers, df_cularea.shape[1]).reshape(-1, 1)
+
+    #     # Log-transform cumulative area values
+    #     log_cularea = np.log10(df_cularea.values).reshape(-1, 1)
+
+    #     # Min-Max scaling after log transformation for X values
+    #     scaler = MinMaxScaler()
+    #     log_numbers_scaled = scaler.fit_transform(log_numbers)
+    #     log_cularea_scaled = scaler.fit_transform(log_cularea)
+
+    #     # Concatenate to form design matrix X
+    #     X = np.hstack([log_numbers_scaled, log_cularea_scaled])
+    #     X = sm.add_constant(X)  # Add constant for the intercept
+
+    #     # Flatten the 3D matrix to 2D for avg_actv_nxs
+    #     n_samples, nx, ny = avg_actv_nxs.shape
+        
+    #     # Extract the normalized values for the specific object using self.id
+    #     y = avg_actv_nxs[self.id].reshape(-1, 1)
+
+    #     # Perform regression
+    #     model = sm.OLS(y, X).fit()
+
+    #     # Extract coefficients for log(number) and log(cumulative area)
+    #     coeff1, coeff2 = model.params[1], model.params[2]
+
+    #     # Save the coefficients as attributes
+    #     self.coeff1 = coeff1
+    #     self.coeff2 = coeff2
+    #     self.r_sqrd = model.rsquared
+
+    def regression_model(self, avg_actv_nxs, var='both'):
         # Read df_cularea
         df_cularea = pd.read_csv('../number_size_cumulativearea.csv', index_col=0)
 
@@ -226,13 +263,22 @@ class Unit:
         # Log-transform cumulative area values
         log_cularea = np.log10(df_cularea.values).reshape(-1, 1)
 
-        # Min-Max scaling after log transformation for X values
+        # Min-Max scaling after log transformation
         scaler = MinMaxScaler()
         log_numbers_scaled = scaler.fit_transform(log_numbers)
         log_cularea_scaled = scaler.fit_transform(log_cularea)
 
-        # Concatenate to form design matrix X
-        X = np.hstack([log_numbers_scaled, log_cularea_scaled])
+        # Select the variables based on the input parameter
+        if var == 'number':
+            X = log_numbers_scaled
+        elif var == 'area':
+            X = log_cularea_scaled
+        elif var == 'both':
+            # Concatenate to form design matrix X
+            X = np.hstack([log_numbers_scaled, log_cularea_scaled])
+        else:
+            raise ValueError("Invalid variable selected. Choose 'number', 'area', or 'both'.")
+
         X = sm.add_constant(X)  # Add constant for the intercept
 
         # Flatten the 3D matrix to 2D for avg_actv_nxs
@@ -244,13 +290,17 @@ class Unit:
         # Perform regression
         model = sm.OLS(y, X).fit()
 
-        # Extract coefficients for log(number) and log(cumulative area)
-        coeff1, coeff2 = model.params[1], model.params[2]
-
-        # Save the coefficients as attributes
-        self.coeff1 = coeff1
-        self.coeff2 = coeff2
-        self.r_sqrd = model.rsquared
+        # Save the coefficients and R-squared as attributes based on the chosen variable(s)
+        if var == 'number':
+            self.coeff_number = model.params[1]  # Assuming that after the constant, the first coefficient corresponds to 'number'
+            self.r_sqrd_number = model.rsquared
+        elif var == 'area':
+            self.coeff_area = model.params[1]  # Assuming that after the constant, the first coefficient corresponds to 'area'
+            self.r_sqrd_area = model.rsquared
+        elif var == 'both':
+            self.coeff1 = model.params[1]  # Coefficient for 'number'
+            self.coeff2 = model.params[2]  # Coefficient for 'area'
+            self.r_sqrd = model.rsquared
 
 
 
